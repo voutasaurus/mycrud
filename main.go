@@ -23,15 +23,51 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	uu, err := d.Users()
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("before add:")
 	for _, u := range uu {
-		fmt.Printf("%+v\n", u)
+		fmt.Println(u)
 	}
 
-	log.Println("connection to db successful")
+	if err := d.AddUser("jerry"); err != nil {
+		log.Fatal(err)
+	}
+	uu, err = d.Users()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("after add:")
+	for _, u := range uu {
+		fmt.Println(u)
+	}
+
+	if err := d.UpdateUser("jerry", "Jerry"); err != nil {
+		log.Fatal(err)
+	}
+	uu, err = d.Users()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("after update:")
+	for _, u := range uu {
+		fmt.Println(u)
+	}
+
+	if err := d.DelUser("Jerry"); err != nil {
+		log.Fatal(err)
+	}
+	uu, err = d.Users()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("after delete:")
+	for _, u := range uu {
+		fmt.Println(u)
+	}
 }
 
 var (
@@ -138,6 +174,15 @@ type user struct {
 	name      string
 }
 
+func (u *user) String() string {
+	return fmt.Sprintf("[ ID: %s, CreatedAt: %s, UpdatedAt: %s, Name: %q ]",
+		u.id,
+		u.createdAt.UTC().Format(time.RFC3339),
+		u.updatedAt.UTC().Format(time.RFC3339),
+		u.name,
+	)
+}
+
 func (db *db) Users() ([]*user, error) {
 	q := `select id,cat,uat,name from user`
 	rows, err := db.db.Query(q)
@@ -159,13 +204,32 @@ func (db *db) Users() ([]*user, error) {
 	return uu, nil
 }
 
+func (db *db) AddUser(name string) error {
+	q := `insert into user(name) values(?)`
+	_, err := db.db.Exec(q, name)
+	return err
+}
+
+func (db *db) DelUser(name string) error {
+	q := `delete from user where name=?`
+	_, err := db.db.Exec(q, name)
+	return err
+}
+
+func (db *db) UpdateUser(oldname, newname string) error {
+	q := `update user set name=? where name=?`
+	_, err := db.db.Exec(q, newname, oldname)
+	return err
+}
+
 /* user table
 
 create table user (
 	id char(128),
 	cat timestamp default current_timestamp,
 	uat timestamp default current_timestamp on update current_timestamp,
-	name text
+	name varchar(128)
+	unique (name)
 )
 
 delimiter //
