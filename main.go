@@ -30,6 +30,7 @@ var (
 	errCertPath       = errors.New("DB_CA_CERT_PATH is required and was not set")
 	errClientCertPath = errors.New("DB_CLIENT_CERT_PATH is required and was not set")
 	errClientKeyPath  = errors.New("DB_CLIENT_KEY_PATH is required and was not set")
+	errCertPEM        = errors.New("trusted conn with DB not established, cannot parse cert PEM")
 )
 
 func dbConfFromEnv() (*mysql.Config, error) {
@@ -76,23 +77,6 @@ func dbConfFromEnv() (*mysql.Config, error) {
 	return dconf, nil
 }
 
-type db struct {
-	db *sql.DB
-}
-
-func newDB(dconf *mysql.Config) (*db, error) {
-	d, err := sql.Open("mysql", dconf.FormatDSN())
-	if err != nil {
-		return nil, err
-	}
-	if err := d.Ping(); err != nil {
-		return nil, err
-	}
-	return &db{db: d}, nil
-}
-
-var errCertPEM = errors.New("database: trusted conn with DB not established, cannot parse cert PEM")
-
 // tlsConfig calls mysql driver to enable TLS for mysql connection. tconfKey is
 // a key to retrieve the specific tls.Config created by tlsConfig.  It should
 // be used in the db connection string as the value of the tls param.  Use
@@ -123,11 +107,26 @@ func tlsConfig(caCertPath, clientCertPath, clientKeyPath string) (tconfKey strin
 	return tconfKey, nil
 }
 
+type db struct {
+	db *sql.DB
+}
+
+func newDB(dconf *mysql.Config) (*db, error) {
+	d, err := sql.Open("mysql", dconf.FormatDSN())
+	if err != nil {
+		return nil, err
+	}
+	if err := d.Ping(); err != nil {
+		return nil, err
+	}
+	return &db{db: d}, nil
+}
+
 /* user table
 
 create table user (
 	id char(128),
-	cat datetime default current_timestamp,
+	cat timestamp default current_timestamp,
 	uat timestamp default current_timestamp on update current_timestamp,
 	name text
 )
