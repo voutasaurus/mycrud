@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -22,7 +23,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_ = d
+	uu, err := d.Users()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, u := range uu {
+		fmt.Printf("%+v\n", u)
+	}
+
 	log.Println("connection to db successful")
 }
 
@@ -35,12 +43,13 @@ var (
 
 func dbConfFromEnv() (*mysql.Config, error) {
 	dconf := &mysql.Config{
-		User:   "root",
-		Passwd: "",
-		Net:    "tcp",
-		Addr:   "localhost:3306",
-		DBName: "mycrud",
-		Loc:    time.UTC,
+		User:      "root",
+		Passwd:    "",
+		Net:       "tcp",
+		Addr:      "localhost:3306",
+		DBName:    "mycrud",
+		Loc:       time.UTC,
+		ParseTime: true,
 	}
 	if v, ok := os.LookupEnv("DB_USER"); ok {
 		dconf.User = v
@@ -114,12 +123,40 @@ type db struct {
 func newDB(dconf *mysql.Config) (*db, error) {
 	d, err := sql.Open("mysql", dconf.FormatDSN())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("newDB Open: %v", err)
 	}
 	if err := d.Ping(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("newDB Ping: %v", err)
 	}
 	return &db{db: d}, nil
+}
+
+type user struct {
+	id        string
+	createdAt time.Time
+	updatedAt time.Time
+	name      string
+}
+
+func (db *db) Users() ([]*user, error) {
+	q := `select id,cat,uat,name from user`
+	rows, err := db.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var uu []*user
+	for rows.Next() {
+		u := user{}
+		if err := rows.Scan(&u.id, &u.createdAt, &u.updatedAt, &u.name); err != nil {
+			return nil, err
+		}
+		uu = append(uu, &u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return uu, nil
 }
 
 /* user table
